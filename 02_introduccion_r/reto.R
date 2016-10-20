@@ -87,7 +87,7 @@ subset(df, select=c(suma,1:length(df)-1))
 class(state.x77)
 df<-as.data.frame(state.x77)
 # b) Extrae el número de estados con un ingreso menor a 4300
-df[df$Income <4300, ]
+nrow(df[df$Income <4300, ])
 # c) Extrae el estado con el ingreso más alto. Pista: ?which
 row.names(df)[which(df$Income == max(df$Income))]
 # Ejercicio 13
