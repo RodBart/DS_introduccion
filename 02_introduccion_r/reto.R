@@ -10,7 +10,7 @@ w <- c(2, 7, 8)
 v <- c("A", "B", "C")
 x <- list(w, v)
 # escribe una nueva sentencia que reemplace "A" por "K" en la lista x
-gsub("A", "K", x)
+x[[2]][1]<-"K"
 
 
 # Ejercicio 2: dado a
@@ -60,7 +60,7 @@ data.frame(state.center) #en este caso no he entendido muy bien si se quiere con
 # Ordena las filas de manera descendente con los valores de la primera columna
 # pista: ?order
 df<-data.frame(uno=c(1:3),dos=c(6:4),tres=c(4:6))
-df[order(df$uno,decreasing = TRUE)]
+df[order(-df$uno),]
 
 # Ejercicio 10
 # A partir del data.frame
