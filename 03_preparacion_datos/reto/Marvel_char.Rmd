@@ -1,0 +1,73 @@
+---
+title: "Marvel_characters"
+author: "Rodrigo"
+date: "3 de noviembre de 2016"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r marvel, include=FALSE}
+#librería que me permite extraer partes de una web
+library(rvest)
+library(shiny)
+library(digest)
+library(httr)
+privateKey<-"19778d6bbbadd0858e9a4ce1b753bbfaf05f2dd7"
+publicKey <-"09016a0f23a1e7548ef98fa6cbf6e754"
+client_id<-"5456"
+client_secret<-"ef5bbc6fa384268221ed54dd7c19676f"
+url <- "https://gateway.marvel.com/v1/public/characters?name="
+tiempo<-Sys.Date()
+to_hash <- paste0(tiempo, privateKey, publicKey)
+jas <- digest::digest(to_hash, "md5", FALSE)
+#copio la web a una variable
+HTMLcharacters <- read_html("http://marvel.com/comics/characters")
+#guardo en un vector todos los personajes de marvel
+personajes<-HTMLcharacters %>%  html_nodes(".JCAZList-MultiCol a") %>%  html_text()
+```
+```{r echo = FALSE}
+ui <- fluidPage(
+  selectInput("personaje", "Elije un personaje", choices = personajes),
+  tableOutput("Personaje_elegido"),
+  tableOutput("listado_comics")
+)
+
+server <- function(input, output) {
+  
+  contenido<- function() {
+    nombre<-gsub(" ", "%20", as.character(input$personaje))
+    url2<-paste0(url,nombre,"&apikey=",publicKey,"&ts=",tiempo,"&hash=",jas)
+    res <- GET(url2)
+    conten<-content(res)$data$results[[1]]
+    return (conten)
+  }
+  
+    resultado1<- function() {
+      ID<-contenido()$id
+      DESCRIPCION<-contenido()$description
+      tabla<-data.frame(ID,DESCRIPCION)
+      colnames(tabla)<-c("ID","Descripción")
+      return (tabla)
+    }
+  
+   resultado2<- function() {
+    comic<- if (contenido()$comics$returned==0){"No se ha recuperado ningún comic"}else {matrix(unlist(contenido()$comics$items),ncol=2,byrow=TRUE)[,2]}
+    tabla<-data.frame(comic)
+   colnames(tabla)<-c("comics en los que aparece")
+    return (tabla)
+  }
+  
+
+  output$Personaje_elegido <- renderTable({ resultado1()})
+  output$listado_comics <- renderTable({ resultado2()})
+}
+
+shinyApp(ui, server)
+
+```
+
+
+
