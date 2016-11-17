@@ -1,24 +1,19 @@
 ---
-title: "Marvel_characters"
-author: "Rodrigo"
-date: "3 de noviembre de 2016"
 output: html_document
 runtime: shiny
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-```{r marvel, include=FALSE}
+
+```{r carga, include=FALSE}
 #librería que me permite extraer partes de una web
 library(rvest)
 library(shiny)
 library(digest)
 library(httr)
+library(jsonlite)
+#ACCESO MARVEL
 privateKey<-"19778d6bbbadd0858e9a4ce1b753bbfaf05f2dd7"
 publicKey <-"09016a0f23a1e7548ef98fa6cbf6e754"
-client_id<-"5456"
-client_secret<-"ef5bbc6fa384268221ed54dd7c19676f"
 url <- "https://gateway.marvel.com/v1/public/characters?name="
 tiempo<-Sys.Date()
 to_hash <- paste0(tiempo, privateKey, publicKey)
@@ -27,13 +22,32 @@ jas <- digest::digest(to_hash, "md5", FALSE)
 HTMLcharacters <- read_html("http://marvel.com/comics/characters")
 #guardo en un vector todos los personajes de marvel
 personajes<-HTMLcharacters %>%  html_nodes(".JCAZList-MultiCol a") %>%  html_text()
+####ACCESO DEVIANTART
+getFunctionEndPoint <- function(url, format) {
+  return(paste(url, format, sep = '/'))
+}
+respDEVIANT <- POST(
+  url = getFunctionEndPoint(
+    url = "https://www.deviantart.com/oauth2/token",
+    format = "json"),
+  body = list(grant_type="client_credentials", client_id="5457" , client_secret="bc0fbd61bac0be48425e48a9ca34aef2"))
+tokenDEVIANT=fromJSON(rawToChar(respDEVIANT$content))$access_token
+
 ```
 ```{r echo = FALSE}
 ui <- fluidPage(
-  selectInput("personaje", "Elije un personaje", choices = personajes),
-  tableOutput("Personaje_elegido"),
+  
+  titlePanel( "Personajes Marvel"),
+  sidebarLayout(
+   sidebarPanel( selectInput("personaje", "Elije un personaje", choices = personajes) )
+   
+   ,
+   mainPanel(
+   tableOutput("Personaje_elegido"),
   tableOutput("listado_comics")
+  ,uiOutput('imgdeviantart'),fluid = FALSE
 )
+))
 
 server <- function(input, output) {
   
@@ -60,9 +74,22 @@ server <- function(input, output) {
     return (tabla)
   }
   
-
+resultado3<- function() {
+  busqueda<-gsub(" ", "%20", as.character(input$personaje))
+    URLDEV<-paste0("https://www.deviantart.com/api/v1/oauth2/browse/popular?category_path=cartoons/digital/comics/&q=",busqueda,"&timerange=alltime&limit=2&access_token=",tokenDEVIANT)
+    
+    TEST<-GET(URLDEV)
+    imagen<- if (contenido()$comics$returned==0){"http://www.clker.com/cliparts/q/L/P/Y/t/6/no-image-available-md.png"}else {content(TEST)$results[[1]]$preview$src}
+    
+    return (imagen)
+  }
+  
   output$Personaje_elegido <- renderTable({ resultado1()})
   output$listado_comics <- renderTable({ resultado2()})
+  output$imgdeviantart <- renderUI({
+      images <- c(resultado3())
+      tags$img(src= images)
+    })
 }
 
 shinyApp(ui, server)
