@@ -2,52 +2,83 @@
 output: html_document
 runtime: shiny
 ---
+# descripción de la funcionalidad
+
+  Tras obtener de la web de marvel el listado completo de todos los personajes, uso su api para obtener su descripción (si existe) e ID.
+  
+  Una vez elegido el personaje obtengo la primera imagen que hay en deviantart usando como término de búsqueda el personaje elegido en el desplegable.
+
+# Breve descripción de las APIS utilizadas
+
+## API MARVEl
+
+  La api de marvel es bastante limitada, con varios métodos para obtener información acerca de comics, personajes, autores y eventos relacionados con el universo marvel. Por cada llamada devuelve un número fijo de resultados, pero utilizando correctamente el parámetro offset se pueden obtener los siguientes bloques.
 
 
-```{r carga, include=FALSE}
-#librería que me permite extraer partes de una web
+## API DEVIANT ART
+
+  Es una api bastante completa, permite obtener infomación de los usuarios, notas, mensajes, galerías, comentarios...También permite realizar búsquedas ordenadas de diferentes maneras, además de realizar filtrados por categoría por ejemplo.
+
+```{r librerias, include=FALSE}
 library(rvest)
 library(shiny)
 library(digest)
 library(httr)
 library(jsonlite)
-#ACCESO MARVEL
-privateKey<-"19778d6bbbadd0858e9a4ce1b753bbfaf05f2dd7"
-publicKey <-"09016a0f23a1e7548ef98fa6cbf6e754"
-url <- "https://gateway.marvel.com/v1/public/characters?name="
-tiempo<-Sys.Date()
-to_hash <- paste0(tiempo, privateKey, publicKey)
-jas <- digest::digest(to_hash, "md5", FALSE)
-#copio la web a una variable
-HTMLcharacters <- read_html("http://marvel.com/comics/characters")
-#guardo en un vector todos los personajes de marvel
-personajes<-HTMLcharacters %>%  html_nodes(".JCAZList-MultiCol a") %>%  html_text()
-####ACCESO DEVIANTART
-getFunctionEndPoint <- function(url, format) {
-  return(paste(url, format, sep = '/'))
-}
-respDEVIANT <- POST(
-  url = getFunctionEndPoint(
-    url = "https://www.deviantart.com/oauth2/token",
-    format = "json"),
-  body = list(grant_type="client_credentials", client_id="5457" , client_secret="bc0fbd61bac0be48425e48a9ca34aef2"))
-tokenDEVIANT=fromJSON(rawToChar(respDEVIANT$content))$access_token
-
 ```
+
+
+
+```{r echo = FALSE}
+#MARVEL
+  url <- "https://gateway.marvel.com/v1/public/characters?name="
+  #accedo a la web en la que se encuentran todos los personajes de marvel
+  HTMLcharacters <- read_html("http://marvel.com/comics/characters")
+  #guardo en un vector todos los personajes de marvel
+  personajes<-HTMLcharacters %>%  html_nodes(".JCAZList-MultiCol a") %>%  html_text()
+  
+  #accesso Api Marvel
+  privateKey<-"19778d6bbbadd0858e9a4ce1b753bbfaf05f2dd7"
+  publicKey <-"09016a0f23a1e7548ef98fa6cbf6e754"
+  tiempo<-Sys.Date()
+  to_hash <- paste0(tiempo, privateKey, publicKey)
+  jas <- digest::digest(to_hash, "md5", FALSE)
+  
+  
+####ACCESO DEVIANTART
+  getFunctionEndPoint <- function(url, format) {
+    return(paste(url, format, sep = '/'))
+  }
+  respDEVIANT <- POST(
+    url = getFunctionEndPoint(
+      url = "https://www.deviantart.com/oauth2/token",
+      format = "json"),
+    body = list(grant_type="client_credentials", client_id="5457" , client_secret="bc0fbd61bac0be48425e48a9ca34aef2"))
+  
+  #Token Api Deviantart
+  tokenDEVIANT=fromJSON(rawToChar(respDEVIANT$content))$access_token
+```
+
+
+
+
+
+
 ```{r echo = FALSE}
 ui <- fluidPage(
   
   titlePanel( "Personajes Marvel"),
-  sidebarLayout(
-   sidebarPanel( selectInput("personaje", "Elije un personaje", choices = personajes) )
+    sidebarLayout(
+      sidebarPanel( selectInput("personaje", "Elije un personaje", choices = personajes) ),
    
-   ,
-   mainPanel(
-   tableOutput("Personaje_elegido"),
-  tableOutput("listado_comics")
-  ,uiOutput('imgdeviantart'),fluid = FALSE
+    mainPanel(
+      tableOutput("Personaje_elegido"),
+      tableOutput("listado_comics"),
+      uiOutput('imgdeviantart'),
+      fluid = FALSE
+    )
+  )
 )
-))
 
 server <- function(input, output) {
   
@@ -68,25 +99,25 @@ server <- function(input, output) {
     }
   
    resultado2<- function() {
-    comic<- if (contenido()$comics$returned==0){"No se ha recuperado ningún comic"}else {matrix(unlist(contenido()$comics$items),ncol=2,byrow=TRUE)[,2]}
-    tabla<-data.frame(comic)
-   colnames(tabla)<-c("comics en los que aparece")
-    return (tabla)
+     comic<- if (contenido()$comics$returned==0){"No se ha recuperado ningún comic"}else{
+       matrix(unlist(contenido()$comics$items),ncol=2,byrow=TRUE)[,2]}
+     tabla<-data.frame(comic)
+     colnames(tabla)<-c("comics en los que aparece")
+     return (tabla)
   }
   
-resultado3<- function() {
-  busqueda<-gsub(" ", "%20", as.character(input$personaje))
+  resultado3<- function() {
+    busqueda<-gsub(" ", "%20", as.character(input$personaje))
     URLDEV<-paste0("https://www.deviantart.com/api/v1/oauth2/browse/popular?category_path=cartoons/digital/comics/&q=",busqueda,"&timerange=alltime&limit=2&access_token=",tokenDEVIANT)
     
     TEST<-GET(URLDEV)
     imagen<- if (contenido()$comics$returned==0){"http://www.clker.com/cliparts/q/L/P/Y/t/6/no-image-available-md.png"}else {content(TEST)$results[[1]]$preview$src}
-    
     return (imagen)
   }
   
-  output$Personaje_elegido <- renderTable({ resultado1()})
-  output$listado_comics <- renderTable({ resultado2()})
-  output$imgdeviantart <- renderUI({
+    output$Personaje_elegido <- renderTable({ resultado1()})
+    output$listado_comics <- renderTable({ resultado2()})
+    output$imgdeviantart <- renderUI({
       images <- c(resultado3())
       tags$img(src= images)
     })
@@ -95,6 +126,3 @@ resultado3<- function() {
 shinyApp(ui, server)
 
 ```
-
-
-
