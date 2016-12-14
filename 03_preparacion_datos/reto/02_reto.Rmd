@@ -1,0 +1,88 @@
+---
+title: "Reto sesión 3"
+author: "Rodrigo bartolomé"
+date: "2016-12-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r librerias, include=FALSE}
+library(dplyr)
+```
+
+
+```{r datos origen, include=FALSE}
+nombEEUU <- read.csv("C:/Users/rodrigo/Documents/curso_DS_intro/03_preparacion_datos/reto/StateNames.csv", header=TRUE, sep = ",")
+nombEEUUTBL<-tbl_df(nombEEUU)
+```
+
+###¿Cuántos registros hay de hombres y cuántos de mujeres?
+```{r}
+nombEEUUTBL %>%
+  group_by(Gender)%>% 
+  summarise(count = n())
+
+```
+###¿Cuál es la longitud media de los nombres por año?
+```{r}
+  nombEEUUTBL %>%
+    mutate(longitud_nombre=nchar(as.character(Name))*Count)%>%
+      group_by(Year)%>%
+      summarise( media_longitud_nombre=sum(longitud_nombre)/(sum(Count)))
+
+```
+### ¿Cuál es el nombre más popular de mujer por año a partir del 2000? Ordena el resultado cronológicamente
+```{r}
+  nombEEUUTBL %>%
+    filter(Year>=2000 & Gender=='F')%>%
+      group_by(Year, Name)%>%
+        mutate(conteo=sum(Count))%>%
+          group_by(Year)%>%
+            mutate( maximo= max(conteo))%>%
+              group_by(Year,Name)%>%
+                summarise(cont=max(conteo),maxim=max(maximo))%>%
+                  filter(maxim==cont)%>%
+                  arrange(Year)
+
+```
+### Encuentra los 10 nombres más unisex de 2014. Es decir, que la proporción de chicas / chicos sea lo más cercana al 50% posible
+```{r}
+ mujeres<- nombEEUUTBL %>%
+    filter(Year==2014 & Gender=='F') %>%
+      group_by(Name)%>%
+      summarise(conteo=sum(Count))
+
+ hombres<- nombEEUUTBL %>%
+    filter(Year==2014 & Gender=='M')%>%
+      group_by(Name)%>%
+      summarise(conteo=sum(Count))
+
+indsH <-which(c(as.character(hombres$Name)) %in% c(as.character(mujeres$Name)))
+coinciH<-hombres[indsH,]
+
+indsM <-which(c(as.character(mujeres$Name)) %in% c(as.character(hombres$Name)))
+coinciM<-mujeres[indsM,]
+
+coinciH$conteoM <-coinciM$conteo
+ 
+coinciH$rel<-abs( coinciH$conteo-coinciH$conteoM)
+
+
+print(coinciH %>%
+  arrange(rel,desc(conteo)), n=10)
+
+```
+### ¡Un nombre hipster! Extrae el conteo del nombre Leo cada 5 años (p.ej. en los años múltiplos de 5), mostrando el agregado de ese año
+```{r}
+  aa<-nombEEUUTBL %>%
+    filter( Year%%5==0 & Name=='Leo') %>%
+      group_by(Year, Name)%>%
+        summarise(conteo=sum(Count))
+
+print(aa, n=100)
+
+```
