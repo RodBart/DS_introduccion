@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r librerias, include=FALSE}
 library(dplyr)
+library(ggplot2)
 ```
 
 
@@ -104,4 +105,10 @@ bb <- nombEEUUTBL %>%
 ```
 ```{r}
 plot(bb$Year,bb$conteo)
+
+ggplot(data = bb,aes(x = Year, y = conteo)) +
+  geom_point()+
+   geom_smooth(method = "auto")
+
+
 ```
