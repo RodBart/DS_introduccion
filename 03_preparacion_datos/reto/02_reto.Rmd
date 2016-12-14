@@ -16,6 +16,7 @@ library(dplyr)
 
 
 ```{r datos origen, include=FALSE}
+#almacenamos en una variable el csv que se encuentra en local
 nombEEUU <- read.csv("C:/Users/rodrigo/Documents/curso_DS_intro/03_preparacion_datos/reto/StateNames.csv", header=TRUE, sep = ",")
 nombEEUUTBL<-tbl_df(nombEEUU)
 ```
@@ -51,24 +52,32 @@ nombEEUUTBL %>%
 ```
 ### Encuentra los 10 nombres más unisex de 2014. Es decir, que la proporción de chicas / chicos sea lo más cercana al 50% posible
 ```{r}
+#Almaceno los nombres de mujeres en 2014
  mujeres<- nombEEUUTBL %>%
     filter(Year==2014 & Gender=='F') %>%
       group_by(Name)%>%
       summarise(conteo=sum(Count))
 
+#Almaceno los nombres de hombres en 2014
  hombres<- nombEEUUTBL %>%
     filter(Year==2014 & Gender=='M')%>%
       group_by(Name)%>%
       summarise(conteo=sum(Count))
 
+ #creo índice donde encuentro que coinciden los nombres de hombres y mujeres en base al listado de hombres
 indsH <-which(c(as.character(hombres$Name)) %in% c(as.character(mujeres$Name)))
+#guardo los valores que coinciden con el íncide
 coinciH<-hombres[indsH,]
 
+#creo índice donde encuentro que coinciden los nombres de hombres y mujeres en base al listado de mujeres
 indsM <-which(c(as.character(mujeres$Name)) %in% c(as.character(hombres$Name)))
+#guardo los valores que coinciden con el íncide
 coinciM<-mujeres[indsM,]
 
+#Al estar ordenado añado la columna de conteo de las mujeres para comparar mas adelante
 coinciH$conteoM <-coinciM$conteo
  
+#resto los coteos y los dejo en valor absoluto, cuanto mas cerca de 0 tendrán porcentajes mas iguales.
 coinciH$rel<-abs( coinciH$conteo-coinciH$conteoM)
 
 
@@ -84,5 +93,15 @@ print(coinciH %>%
         summarise(conteo=sum(Count))
 
 print(aa, n=100)
+plot(aa$Year,aa$conteo)
+```
+```{r , include=FALSE}
+bb <- nombEEUUTBL %>%
+    filter( Name=='Leo') %>%
+      group_by(Year, Name)%>%
+        summarise(conteo=sum(Count))
 
+```
+```{r}
+plot(bb$Year,bb$conteo)
 ```
