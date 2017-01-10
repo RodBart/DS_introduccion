@@ -1,0 +1,256 @@
+---
+title: "Terrorismo Global S"
+author: "Rodrigo"
+date: "10 de enero de 2017"
+runtime: shiny
+output: html_document
+---
+```{r librerias, include=FALSE}
+library(data.table)
+library(ggplot2)
+library(shiny)
+library(leaflet)
+```
+
+## Introduccion ##
+El objetivo de este análisis es ver la evolución del terrorismo tanto en nuestro país como en nuestro entorno, para poder compararlo con otras latitudes y ver si podemos sacar algunas conclusiones.
+Los datos han sido obtenidos de Global Terrorism Database (https://www.kaggle.com/START-UMD/gtd)  que contiene datos de atentados terroristas desde 1970 a 2015. En este enlace se puede ver la descripción de los datos y la decodificación de   http://start.umd.edu/gtd/downloads/Codebook.pdf
+
+
+
+```{r setup, include=FALSE}
+datos<- read.csv("C:/Users/rodrigo/Documents/curso_DS_intro/04_visualizacion/reto/globalterrorismdb_0616dist.csv",sep=',')
+datos.dt <- as.data.table(datos)
+remove(datos)
+subdatos<-datos.dt[, .(iyear, country_txt, region, region_txt, latitude, longitude,nkill,gname)]
+remove(datos.dt)
+
+```
+
+```{r España, include=FALSE}
+#Atentados realizados en España 
+subSpain<-subdatos[country_txt== "Spain"]
+#Nº de atentados por año
+NumAtentadosSpa<-subSpain[, .(count = .N, na.rm = T), by = iyear]
+setnames(NumAtentadosSpa,"count","ataques")
+#Nº de muertos por año en España por atentados
+NumAtentadosSpaNum<-subSpain[, .(count = sum(nkill, na.rm = T)), by = iyear]
+setnames(NumAtentadosSpaNum,"count","muertos")
+#Nº de muertos por año y grupo terrorista, debido a que hay muchos grupos filtramos por aquellos que han tenido mas de un muerto
+NumAtentadosSpaGr<-subSpain[, .(count = sum(nkill, na.rm = T)), by = c("iyear","gname")]
+
+NumAtentadosSpaGr <- NumAtentadosSpaGr[count>0]
+#GT <- data.table(c(1: length(unique(NumAtentadosSpaGr$gname))), unique(NumAtentadosSpaGr$gname))
+#GT[] <- lapply(GT, as.character)
+#setkey(GT, V2)
+#setkey(NumAtentadosSpaGr,gname)
+#NumAtentadosSpaGr<-NumAtentadosSpaGr[GT]
+```
+
+Primero vamos a ver el número de ataques terroristas que ha habido en España en el periodo del que tenemos datos.
+
+```{r,echo=FALSE}
+aten <- ggplot() + geom_line(data=NumAtentadosSpa, aes(iyear,ataques, colour="red") )+ 
+  theme(legend.position="none")
+  
+print(aten)
+```
+
+Podemos ver que en los últimos años ha habido un descenso de ataques. Comprobamos si también ha habido un descenso en el número de muertos.
+
+```{r,echo=FALSE}
+ggplot(NumAtentadosSpaNum, aes(iyear,muertos)) + geom_line(colour="darkblue")
+#se añade a la grafica primera la segunda gráfica
+p <- aten + geom_line(data=NumAtentadosSpaNum, aes(iyear,muertos))
+```
+
+Parece que a excepción de un pico en 2004 (los atentados del 11M en Madrid) también se ha reducido el número de muertos. En principio podríamos pensar que está directamente relacionado con el fin de los actos violentos de ETA, por lo que vamos a ver quién ha cometido Atentados en España.
+No se muestran todos los grupos terroristas por no llenar la gráfica con muchos datos, sólo se muestran los que más impacto han tenido.
+
+```{r,echo=FALSE}
+#se añade a las dos primeras gráficas la tercera
+p<- p + geom_point(data=NumAtentadosSpaGr, aes(iyear,count, colour=gname))+
+  scale_colour_discrete(name  ="Grupo",
+                            breaks=c("Basque Fatherland and Freedom (ETA)", "First of October Antifascist Resistance Group (GRAPO)","Revolutionary Patriotic Anti-Fascist Front (FRAP)","Unknown","Argentine Anticommunist Alliance (AAA)","Red Army Faction (RAF)","Iberian Anarchist Federation","Justice Commandos for the Armenian Genocide","Neo-Fascists","Spanish Basque Battalion (BBE) (rightist)","Catalan Liberation Front (FAC)","Hezbollah","Polisario Front","Basque Separatists","Force 17","Free Galician People's Guerrilla Army","Abu Hafs al-Masri Brigades","Iberian Liberation Movement","Anti-Terrorism ETA","red"),
+                            
+                        labels=c("ETA", "GRAPO","FRAP","Desconocido","AAA","RAF","FAI","JCAG","Neo-Fascists","BVE","FAC","Hezbollah","Frente Polisario","Basque Separatists","Force 17", "EGPGC","Al-Qaida","MIL","ATE","Número de atentados"))+
+  theme(
+  legend.position="bottom",
+    legend.title=element_blank(),axis.title.y=element_blank(), legend.text=element_text(size=10))
+print(p)
+```
+
+A simple vista el número de muertos en España por terrorismo está muy relacionado con la actividad de ETA. Pero vamos a realizar una coparativa entre las dos variables para poder asegurarnos.
+
+```{r,warning=FALSE,echo=FALSE, message=FALSE}
+
+ETA<- NumAtentadosSpaGr[gname=="Basque Fatherland and Freedom (ETA)"]
+ETA <-  ETA[,c("iyear","count"),  with=FALSE]
+setkey(ETA,iyear)
+setkey(NumAtentadosSpaNum,iyear)
+Resul<-merge(NumAtentadosSpaNum,ETA, all.x=TRUE)
+Resul <-   Resul[,c("count","muertos"),  with=FALSE]
+Resul$count[is.na(Resul$count)]<-0
+conteo<-Resul$count
+muertos<-Resul$muertos
+remove(muertos)
+
+ggplot(Resul, aes(count,muertos)) +geom_point() + geom_smooth(method = "lm", se = FALSE) + labs(x = "Muertos ETA", y ="Muertos total")
+
+
+
+```
+
+
+Ahora vamos a comparar los datos de España con Francia, Alemania, Italia y Reino unido.
+
+```{r,warning=FALSE,echo=FALSE}
+
+subCerca<-subdatos[country_txt== "Spain" | country_txt== "France"| country_txt== "Germany"| country_txt== "Italy" | country_txt=="United Kingdom"| country_txt=="West Germany (FRG)" | country_txt=="East Germany (GDR)"]
+
+NumAtentados<-subCerca[, .(count = .N, na.rm = T), by = c("iyear", "country_txt")]
+setnames(NumAtentados,"count","ataques")
+
+ggplot(NumAtentados, aes(iyear,ataques)) + geom_line(aes(colour = country_txt),size=1.5)+theme(
+  legend.position="bottom",legend.title=element_blank())+geom_smooth(method = 'loess')
+
+```
+
+
+Por lo que podemos observar en nuestro entorno cercano, a finales de los 70 hubo bastante actividad de grupos terroristas para ir reduciéndose progresivamente, hasta llegar al punto mínimo a finales de la década pasada y empezar a ascender en los últimos años.
+
+Vamos a ver si en el número de muertos sucede lo mismo.
+
+```{r,echo=FALSE}
+NumAtentadosCercaNum<-subCerca[, .(count = sum(nkill, na.rm = T)), by = c("iyear", "country_txt")]
+setnames(NumAtentadosCercaNum,"count","muertos")
+ggplot(NumAtentadosCercaNum, aes(iyear,muertos)) + geom_line(aes(colour=country_txt),size=1.5)+theme(
+  legend.position="bottom",legend.title=element_blank())+geom_smooth(method = 'loess')
+
+```
+
+En base a los muertos se podría ver lo mismo que en la gráfica anterior. Tan solo observamos que la tendencia es a ser más plana, habiendo menos diferencia entre los picos y los valles.
+
+Para poder comprobar si para todo nuestro entorno sucede lo mismo, los datos también tienen divisiones por zonas, La zona correspondiente a España (Europa occidental) tienen el siguiente aspecto:
+
+
+```{r,echo=FALSE}
+subWE<-subdatos[region==8 | country_txt=="East Germany (GDR)"]
+
+NumAtentadosWE<-subWE[, .(count = .N, na.rm = T), by = iyear]
+setnames(NumAtentadosWE,"count","ataques")
+
+pWE<- ggplot(NumAtentadosWE, aes(iyear,ataques)) + geom_line(aes(colour="nº ataques") ,size=1.5 )+theme(legend.position="bottom"  ,legend.title=element_blank())
+
+NumAtentadosWENum<-subWE[, .(count = sum(nkill, na.rm = T)), by = iyear]
+setnames(NumAtentadosWENum,"count","muertos")
+pWE<- pWE +geom_line(data=NumAtentadosWENum, aes(iyear,muertos, colour="nº muertos"),size=1.5 )
+print(pWE)
+```
+
+Podemos ver que a nivel general las tendencias son las mismas a nivel europeo ¿y si lo comparamos con el resto del mundo?
+
+```{r,echo=FALSE}
+
+NumAtentadosMun<-subdatos[ region==3 | region==5 | region==8 | region==9 | region==10 | region==11  ]
+NumAtentadosMun<-NumAtentadosMun[, .(count = .N, na.rm = T), by = c("iyear","region_txt")]
+setnames(NumAtentadosMun,"count","ataques")
+
+  ggplot(NumAtentadosMun, aes(iyear,ataques)) + geom_line(aes(colour=region_txt),size=1.5 ) +
+    theme(legend.position="bottom"  ,legend.title=element_blank())
+
+
+
+```
+
+Solo se muestran aquellas zonas en las que ha habido algo reseñable. Se puede ver que en la década de los 70 Europa occidental fue la parte más golpeada por el terrorismo, para ser sustituida a comenzados los 80 por Sudamérica, coincidiendo con la guerra contra la droga que se dio en esa parte del mundo y el surgimiento de grupos guerrilleros y paramilitares (aunque habría que profundizar en los datos y comprobar que esa premisa sea cierta). El relevo de sudamérica lo toma a mediados de los 90 de Oriente medio y Norte de áfrica, aunque rondando el 2000 se tiene una década "más tranquila", a mediados de la primera década del 2000 se dispara casi de forma exponencial en Oriente medio y Norte de áfrica, además al final de la gráfica y podemos ver la aparición de nuevas zonas (áfrica subsahariana, Europa del este y sudeste asiático) golpeadas por el terrorismo que hasta el momento no habían tenido mucha relevancia.
+
+
+En cuanto al número de muertos vamos a ver como la gráfica se dispara, dejando en algo casi anecdótico (si solo hacemos caso a los datos) los mueros en Europa occidental.
+
+```{r,echo=FALSE}
+
+NumMuertosMun<-subdatos[ region==3| region==1 | region==5 | region==8 | region==9 | region==10 | region==11  ]
+NumMuertosMun<-NumMuertosMun[, .(count =sum(nkill, na.rm = T)), by = c("iyear","region_txt")]
+setnames(NumMuertosMun,"count","muertos")
+
+  ggplot(NumMuertosMun, aes(iyear,muertos)) + geom_line(aes(colour=region_txt),size=1.5 ) +
+    theme(legend.position="bottom"  ,legend.title=element_blank())
+  
+
+  
+```
+
+Si vemos el acumulado, podemos ver mas claramente como en los últimos años se ha disparado el número de muertos.
+```{r,echo=FALSE}
+  ggplot(NumMuertosMun, aes(x=iyear, y =muertos, fill=region_txt)) + geom_bar(stat="identity")+    theme(legend.position="bottom"  ,legend.title=element_blank())
+```
+
+A modo de curiosidad estos han sido los ataques con mas muertos
+
+```{r,echo=FALSE}
+subdatos<-subdatos[order(-nkill)]
+top10<-subdatos[1:10]
+top10[,.(country_txt,nkill,iyear)]
+leaflet(top10) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% setView(0,0,2) %>%
+    addCircles( lat = ~ latitude, lng = ~ longitude, popup= ~ paste(country_txt,nkill),weight = 20 )
+
+```
+
+Y aquí se pueden ver los atentados mas grandes de cada año.
+
+```{r,echo=FALSE}
+max_anio<-subdatos[, c("maximo"):=(max(nkill, na.rm = T)), by = iyear]
+max_anio <-   subdatos[nkill==maximo]
+max_anio$latitude[is.na(max_anio$latitude)]<-0
+max_anio$longitude[is.na(max_anio$longitude)]<-0
+leaflet(max_anio) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% setView(0,0,1) %>%
+    addCircles( lat = ~ latitude, lng = ~ longitude,weight = ~(maximo/40))
+    
+
+```
+
+
+Y aquí se pueden ver los atentados mas grandes año a año.
+
+```
+```{r,echo=FALSE}
+ui <- fluidPage(
+  sliderInput("control", "Controller:", min=1970, max=2015, value=1970, step=1),
+ tableOutput("tabla"),
+  leafletOutput("mapa"
+              #  ,width = "100%", height = "100%"
+                ),
+   tableOutput("control_tiempo")
+)
+
+server <- function(input, output, session)  {
+
+  coordenadas<-reactive({
+    if((length(max_anio[iyear==input$control]$iyear==input$control))==0) {max_anio[iyear==input$control-1]}else {max_anio[iyear==input$control]}
+  })
+  
+    output$mapa <- renderLeaflet(
+      leaflet(coordenadas()) %>% addProviderTiles("OpenStreetMap.BlackAndWhite") %>% setView(0,0,1) %>%
+    addCircles( lat = ~ latitude, lng = ~ longitude,weight = ~(maximo/40))
+    )
+
+  
+  Cambia_Input <- reactive({
+  val <- if (input$control==2015) {1970} else {input$control}
+  updateSliderInput(session, "control", value = val+1,  min = 1970, max = 2015, step =  1)
+  })
+  
+  output$control_tiempo <- renderTable({
+
+  Cambia_Input()
+        Sys.sleep(2)
+  })
+  
+    output$tabla <- renderTable({      max_anio[iyear==input$control, .(iyear, country_txt, maximo)]
+                                             
+  })
+}
+shinyApp(ui, server)
+```
+
